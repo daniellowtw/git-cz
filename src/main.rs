@@ -2,7 +2,7 @@ use git_commitizen::{
     build_commit_message, build_commit_types, format_commit_types, perform_commit,
 };
 use promkit::preset::query_selector::QuerySelector;
-use promkit::{preset::confirm::Confirm, preset::readline::Readline, suggest::Suggest};
+use promkit::{preset::readline::Readline, suggest::Suggest};
 use std::env;
 use std::path::Path;
 use std::process::Command;
@@ -74,9 +74,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             body
         };
 
-        // New footer confirmation prompt
-        let mut footer_confirm = Confirm::new("Do you want to add a footer?").prompt()?;
-        let footer = if footer_confirm.run()?.to_lowercase() == "y" {
+        // Footer confirmation prompt defaults to 'N'
+        let mut footer_confirm_input = Readline::default()
+            .title("Do you want to add a footer? (y/N)")
+            .validator(
+                |text| ["y", "yes", "n", "no", "", "Y", "YES", "N", "NO"].contains(&text),
+                |_| String::from("Please type 'y' or 'n' or leave empty for no"),
+            )
+            .prompt()?;
+        let footer_confirm = footer_confirm_input.run()?.to_lowercase();
+        let footer = if footer_confirm == "y" || footer_confirm == "yes" {
             let mut footer_type_input = QuerySelector::new(
                 vec!["fix".to_string(), "close".to_string()],
                 |text, items| -> Vec<String> {
@@ -108,16 +115,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let full_commit_message =
             build_commit_message(&commit_type, &scope, &description, &body, &footer);
-
-        let mut confirm_input =
-            Confirm::new("Do you want to proceed with this commit?").prompt()?;
-        let confirm = confirm_input.run()?;
-        if confirm.to_lowercase() == "y" {
-            perform_commit(Path::new("."), &full_commit_message)?;
-            println!("Commit successful!");
-        } else {
-            println!("Commit aborted.");
-        }
+        perform_commit(Path::new("."), &full_commit_message)?;
+        println!("Commit successful!");
     }
 
     Ok(())
