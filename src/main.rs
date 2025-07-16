@@ -2,11 +2,29 @@ use git_commitizen::{
     build_commit_message, build_commit_types, format_commit_types, perform_commit,
 };
 use promkit::preset::query_selector::QuerySelector;
-use promkit::{preset::confirm::Confirm, preset::readline::Readline, suggest::Suggest};
+use promkit::{preset::readline::Readline, suggest::Suggest};
 use std::env;
 use std::path::Path;
 use std::process::Command;
 use tempfile;
+
+fn optional_confirm(message: &str, default: bool) -> Result<bool, Box<dyn std::error::Error>> {
+    let default_text = if default { "Y" } else { "N" };
+    let prompt_text = format!("{} (y/n, default {})", message, default_text);
+    
+    let mut input = Readline::default()
+        .title(&prompt_text)
+        .prompt()?;
+    
+    let response = input.run()?.trim().to_lowercase();
+    
+    match response.as_str() {
+        "y" | "yes" => Ok(true),
+        "n" | "no" => Ok(false),
+        "" => Ok(default), // Empty input uses default
+        _ => Ok(default), // Invalid input uses default
+    }
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let commit_types = build_commit_types();
@@ -75,8 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         // New footer confirmation prompt
-        let mut footer_confirm = Confirm::new("Do you want to add a footer?").prompt()?;
-        let footer = if footer_confirm.run()?.to_lowercase() == "y" {
+        let footer = if optional_confirm("Do you want to add a footer?", false)? {
             let mut footer_type_input = QuerySelector::new(
                 vec!["fix".to_string(), "close".to_string()],
                 |text, items| -> Vec<String> {
@@ -109,15 +126,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let full_commit_message =
             build_commit_message(&commit_type, &scope, &description, &body, &footer);
 
-        let mut confirm_input =
-            Confirm::new("Do you want to proceed with this commit?").prompt()?;
-        let confirm = confirm_input.run()?;
-        if confirm.to_lowercase() == "y" {
-            perform_commit(Path::new("."), &full_commit_message)?;
-            println!("Commit successful!");
-        } else {
-            println!("Commit aborted.");
-        }
+        perform_commit(Path::new("."), &full_commit_message)?;
+        println!("Commit successful!");
     }
 
     Ok(())
