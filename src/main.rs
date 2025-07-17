@@ -1,5 +1,6 @@
 use git_commitizen::{
-    build_commit_message, build_commit_types, format_commit_types, perform_commit,
+    add_all_tracked_files, build_commit_message, build_commit_types, format_commit_types, 
+    has_unstaged_tracked_files, perform_commit,
 };
 use promkit::preset::query_selector::QuerySelector;
 use promkit::{preset::readline::Readline, suggest::Suggest};
@@ -27,6 +28,14 @@ fn optional_confirm(message: &str, default: bool) -> Result<bool, Box<dyn std::e
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Check if there are unstaged tracked files and prompt to add them
+    if has_unstaged_tracked_files(Path::new("."))? {
+        if optional_confirm("There are unstaged changes for tracked files. Do you want to add them?", true)? {
+            add_all_tracked_files(Path::new("."))?;
+            println!("Staged all tracked files with changes.");
+        }
+    }
+    
     let commit_types = build_commit_types();
     let commit_types_display = format_commit_types(commit_types);
 

@@ -1,4 +1,4 @@
-use git2::{Repository, Signature};
+use git2::{Repository, Signature, Status};
 use std::error::Error;
 use std::path::Path;
 
@@ -73,6 +73,32 @@ pub fn build_commit_message(
     }
 
     full_message
+}
+
+pub fn has_unstaged_tracked_files(repo_path: &Path) -> Result<bool, Box<dyn Error>> {
+    let repo = Repository::discover(repo_path)?;
+    let statuses = repo.statuses(None)?;
+    
+    for status in statuses.iter() {
+        let flags = status.status();
+        // Check if file is tracked and has unstaged changes
+        if flags.contains(Status::WT_MODIFIED) || flags.contains(Status::WT_DELETED) {
+            return Ok(true);
+        }
+    }
+    
+    Ok(false)
+}
+
+pub fn add_all_tracked_files(repo_path: &Path) -> Result<(), Box<dyn Error>> {
+    let repo = Repository::discover(repo_path)?;
+    let mut index = repo.index()?;
+    
+    // Add all tracked files with changes
+    index.add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None)?;
+    index.write()?;
+    
+    Ok(())
 }
 
 pub fn perform_commit(repo_path: &Path, full_commit_message: &str) -> Result<(), Box<dyn Error>> {
